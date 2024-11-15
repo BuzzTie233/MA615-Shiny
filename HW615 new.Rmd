@@ -1,0 +1,403 @@
+---
+title: "Shiny"
+author: "Dayu Tie"
+date: '2024-11-12'
+output: html_document
+---
+```{r}
+library(shiny)
+```
+
+```{r}
+#install.packages('shinydashboard')
+```
+
+Hadley_1
+
+```{r}
+ui <- fluidPage(
+  selectInput("dataset", label = "Dataset", choices = ls("package:datasets")),
+  verbatimTextOutput("summary"),
+  tableOutput("table")
+)
+
+
+server <- function(input, output, session) {
+  output$summary <- renderPrint({
+    dataset <- get(input$dataset, "package:datasets")
+    summary(dataset)
+  })
+  
+  output$table <- renderTable({
+    dataset <- get(input$dataset, "package:datasets")
+    dataset
+  })
+}
+
+shinyApp(ui, server)
+```
+
+Hadley_2
+```{r}
+ui <- fluidPage(
+  selectInput("dataset", label = "Dataset", choices = ls("package:datasets")),
+  verbatimTextOutput("summary"),
+  tableOutput("table")
+)
+
+server <- function(input, output, session) {
+  # Create a reactive expression
+  dataset <- reactive({
+    get(input$dataset, "package:datasets")
+  })
+
+  output$summary <- renderPrint({
+    # Use a reactive expression by calling it like a function
+    summary(dataset())
+  })
+  
+  output$table <- renderTable({
+    dataset()
+  })
+}
+shinyApp(ui, server)
+
+```
+
+#Hadley_1 demonstrates the basic functionality with duplicated dataset retrieval, 
+#while Hadley_2 showcases the use of reactive programming to optimize the app by eliminating redundancy. 
+
+
+
+
+
+2.3.5
+
+1.Which of and should each of the following render functions be paired with?textOutput()verbatimTextOutput()
+
+A.renderPrint(summary(mtcars))
+
+B.renderText("Good morning!")
+
+C.renderPrint(t.test(1:5, 2:6))
+
+D.renderText(str(lm(mpg ~ wt, data = mtcars)))
+
+A：verbatimTextOutput()
+B：textOutput()
+C：verbatimTextOutput()
+D：textOutput()
+
+2.
+```{r}
+#install.packages('shiny')
+library('shiny')
+```
+
+
+```{r}
+library(shiny)
+
+ui <- fluidPage(
+  textOutput("plot_description"), 
+  plotOutput("plot", height = "300px", width = "700px")
+)
+
+server <- function(input, output, session) {
+  output$plot <- renderPlot(
+    plot(1:5), res = 96)
+  
+  output$plot_description <- renderText({
+    "This scatter plot displays five random points, showing values from 1 to 5 along both axes."
+  })
+}
+
+shinyApp(ui, server)
+
+```
+
+3.
+```{r}
+ui <- fluidPage(
+  dataTableOutput("table")
+)
+
+server <- function(input, output, session) {
+  output$table <- DT::renderDT(mtcars, options = list(pageLength = 5))
+}
+
+shinyApp(ui, server)
+
+```
+3.3.6
+1.
+```{r}
+ui <- fluidPage(
+  textInput("name", "What's your name?"),
+  textOutput("greeting")
+)
+```
+
+```{r}
+server1 <- function(input, output, session) {
+  output$greeting <- renderText({
+    paste0("Hello ", input$name)
+  })
+}
+server2 <- function(input, output, session) {
+  output$greeting <- renderText({
+    paste0("Hello ", input$name)
+  })
+}
+server3 <- function(input, output, session) {
+  output$greeting <- renderText({
+    paste0("Hello ", input$name)
+  })
+}
+shinyApp(ui, server)
+
+```
+
+
+2.
+ reactive graph1
+
+input$a  input$b
+   |        |
+   V        V
+      reactive(c) (c <- input$a + input$b)
+                 |
+                 V
+       input$d  reactive(e) (e <- c() + input$d)
+            |          |
+            V          V
+                 output$f (renderText(e()))
+
+
+
+  reactive graph2
+
+input$x1  input$x2  input$x3
+    |        |        |
+    V        V        V
+       reactive(x) (x <- input$x1 + input$x2 + input$x3)
+
+input$y1  input$y2
+    |        |
+    V        V
+       reactive(y) (y <- input$y1 + input$y2)
+                 |
+                 V
+         output$z (renderText(x() / y()))
+
+
+  reactive graph3
+  input$a    input$b      input$c       input$d
+   |         |            |             |
+   V         V            V             V
+reactive(a) reactive(b) reactive(c)  reactive(d)
+(a <- input$a * 10)  (b <- a() + input$b)  (c <- b() / input$c)  (d <- c() ^ input$d)
+
+
+3.
+This code will fail because of a naming conflict. 
+In R, range is the name of a base R function, so defining a reactive variable called range will lead to unexpected behavior or errors. 
+It's best to rename this reactive expression to avoid overriding the base function.
+
+```{r}
+var <- reactive(df[[input$var]])
+var_range <- reactive(range(var(), na.rm = TRUE))
+
+```
+
+
+4.8
+1.
+
+                    ┌───────────────┐
+                    │ input$code    │
+                    └──────┬────────┘
+                           │
+                 ┌─────────▼───────────┐
+                 │ selected()          │
+                 │ (filters injuries   │
+                 │  based on prod_code)│
+                 └───┬──────────┬──────┘
+                     │          │
+        ┌────────────▼───┐ ┌────▼────────────┐
+        │ output$diag    │ │ output$body_part│
+        │ (table count   │ │ (table count    │
+        │  by diag)      │ │  by body_part)  │
+        └────────────────┘ └─────────────────┘
+                      │
+                      │
+                  ┌───▼───────────────┐
+                  │ output$location   │
+                  │ (table count      │
+                  │  by location)     │
+                  └───▲───────────────┘
+                      │
+              ┌───────┴───────────────┐
+              │ summary()             │
+              │ (count by age, sex,   │
+              │  then joined with     │
+              │  population)          │
+              └─────────┬─────────────┘
+                        │
+             ┌──────────▼────────────┐
+             │ output$age_sex        │
+             │ (line plot by age,    │
+             │  n per age-sex group) │
+             └────────────────────────┘
+
+
+
+
+                    ┌───────────────┐
+                    │ input$code    │
+                    └──────┬────────┘
+                           │
+                 ┌─────────▼───────────┐
+                 │ selected()          │
+                 │ (filters injuries   │
+                 │  based on prod_code)│
+                 └───┬──────────┬──────┘
+                     │          │
+        ┌────────────▼───┐ ┌────▼────────────┐
+        │ output$diag    │ │ output$body_part│
+        │ (table count   │ │ (table count    │
+        │  by diag)      │ │  by body_part)  │
+        └────────────────┘ └─────────────────┘
+                      │
+                      │
+                  ┌───▼───────────────┐
+                  │ output$location   │
+                  │ (table count      │
+                  │  by location)     │
+                  └───▲───────────────┘
+                      │
+              ┌───────┴───────────────┐
+              │ summary()             │
+              │ (count by age, sex,   │
+              │  then joined with     │
+              │  population)          │
+              └─────────┬─────────────┘
+                        │
+          ┌─────────────▼────────────────────────────┐
+          │ input$y                                 │
+          │ (user choice: rate vs count)            │
+          └─────────────┬───────────────────────────┘
+                        │
+             ┌──────────▼────────────┐
+             │ output$age_sex        │
+             │ (conditional plot by  │
+             │  age: rate or count   │
+             │  based on input$y)    │
+             └────────────────────────┘
+
+
+
+
+                    ┌───────────────┐
+                    │ input$code    │
+                    └──────┬────────┘
+                           │
+                 ┌─────────▼───────────┐
+                 │ selected()          │
+                 │ (filters injuries   │
+                 │  based on prod_code)│
+                 └───┬──────────┬──────┘
+                     │          │
+        ┌────────────▼───┐ ┌────▼────────────┐
+        │ output$diag    │ │ output$body_part│
+        │ (table count   │ │ (table count    │
+        │  by diag)      │ │  by body_part)  │
+        └────────────────┘ └─────────────────┘
+                      │
+                      │
+                  ┌───▼───────────────┐
+                  │ output$location   │
+                  │ (table count      │
+                  │  by location)     │
+                  └───▲───────────────┘
+                      │
+              ┌───────┴───────────────┐
+              │ summary()             │
+              │ (count by age, sex,   │
+              │  then joined with     │
+              │  population)          │
+              └─────────┬─────────────┘
+                        │
+             ┌──────────▼────────────┐
+             │ output$age_sex        │
+             │ (conditional plot by  │
+             │  age: rate or count)  │
+             └──────────┬────────────┘
+                        │
+             ┌──────────▼────────────┐
+             │ input$story           │
+             └──────────┬────────────┘
+                        │
+            ┌───────────▼─────────────┐
+            │ narrative_sample()      │
+            │ (gets new narrative     │
+            │  on button click)       │
+            └───────────┬─────────────┘
+                        │
+              ┌─────────▼──────────────┐
+              │ output$narrative       │
+              │ (displays current      │
+              │  narrative text)       │
+              └────────────────────────┘
+
+
+
+
+
+
+2.
+If you flip fct_infreq() and fct_lump(), the code will lump all values first, then order by frequency.
+This would lead to a less accurate table where less common factors may end up lumped with more common ones, affecting the interpretability and accuracy of the summarized table.
+
+3.
+
+#column(4, sliderInput("num_rows", "Number of rows:", min = 1, max = 10, value = 5))
+
+#output$diag <- renderTable(count_top(selected(), diag, n = input$num_rows), width = "100%")
+#output$body_part <- renderTable(count_top(selected(), body_part, n = input$num_rows), width = "100%")
+#output$location <- renderTable(count_top(selected(), location, n = input$num_rows), width = "100%")
+
+
+4.
+```{r}
+fluidRow(
+  column(1, actionButton("prev_story", "Previous")),
+  column(1, actionButton("next_story", "Next")),
+  column(10, textOutput("narrative"))
+)
+
+```
+
+
+#narrative_index <- reactiveVal(1)
+
+#observeEvent(input$next_story, {
+#  current <- narrative_index()
+#  narrative_index(min(current + 1, nrow(selected())))
+#})
+
+#observeEvent(input$prev_story, {
+#  current <- narrative_index()
+#  narrative_index(max(current - 1, 1))
+#})
+
+#output$narrative <- renderText({
+#  selected() %>% pull(narrative) %>% .[narrative_index()]
+#})
+
+
+
+
+
+
+
